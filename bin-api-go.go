@@ -43,7 +43,8 @@ type Client struct {
 
 	common service // Reuse a single struct instead of allocating one for each service on the heap.
 
-	Users *UsersService
+	Users          *UsersService
+	UserProperties *UserPropertiesService
 }
 
 type service struct {
@@ -81,6 +82,7 @@ func NewClient(httpClient *http.Client, database string, authToken string) *Clie
 	c := &Client{client: httpClient, BaseURL: baseURL, UserAgent: userAgent, AuthToken: authToken, Database: database}
 	c.common.client = c
 	c.Users = (*UsersService)(&c.common)
+	c.UserProperties = (*UserPropertiesService)(&c.common)
 	return c
 }
 
@@ -130,6 +132,9 @@ func (c *Client) NewRequest(method, urlStr string, body interface{}) (*http.Requ
 		return nil, err
 	}
 
+	// FIXME
+	fmt.Println(u)
+
 	var buf io.ReadWriter
 	if body != nil {
 		buf = &bytes.Buffer{}
@@ -152,8 +157,6 @@ func (c *Client) NewRequest(method, urlStr string, body interface{}) (*http.Requ
 	req.Header.Set("Accept", mediaType)
 	if c.UserAgent != "" {
 		req.Header.Set("User-Agent", c.UserAgent)
-	}
-		req.Header.Set("Authentication", "Basic "+c.AuthToken)
 	}
 	return req, nil
 }

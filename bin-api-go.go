@@ -3,6 +3,9 @@ package binapi
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,13 +14,15 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/go-querystring/query"
 )
 
 const (
-	defaultBaseURL = "http://localhost:8989/"
+	defaultBaseURL = "https://rapi.recombee.com"
 	userAgent      = "bin-api_client"
 
 	mediaType = "application/json"
@@ -34,6 +39,7 @@ type Client struct {
 
 	UserAgent string
 	AuthToken string
+	Database  string
 
 	common service // Reuse a single struct instead of allocating one for each service on the heap.
 
@@ -66,13 +72,13 @@ func addOptions(s string, opts interface{}) (string, error) {
 	return u.String(), nil
 }
 
-func NewClient(httpClient *http.Client, authToken string) *Client {
+func NewClient(httpClient *http.Client, database string, authToken string) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{}
 	}
 	baseURL, _ := url.Parse(defaultBaseURL)
 
-	c := &Client{client: httpClient, BaseURL: baseURL, UserAgent: userAgent, AuthToken: authToken}
+	c := &Client{client: httpClient, BaseURL: baseURL, UserAgent: userAgent, AuthToken: authToken, Database: database}
 	c.common.client = c
 	c.Users = (*UsersService)(&c.common)
 	return c
@@ -83,16 +89,43 @@ type Response struct {
 	*http.Response
 }
 
+func signURLStr(token string, urlStr string) (string, error) {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return "", err
+	}
+
+	qs := u.Query()
+	qs.Add("hmac_timestamp", strconv.FormatInt(time.Now().Unix(), 10))
+	u.RawQuery = qs.Encode()
+
+	h := hmac.New(sha1.New, []byte(token))
+	_, err = h.Write([]byte(u.String()))
+	if err != nil {
+		return "", err
+	}
+
+	signature := hex.EncodeToString(h.Sum(nil))
+	// there will always be at least one option (hmac_timestamp)
+	return u.String() + "&hmac_sign=" + signature, nil
+}
+
 // NewRequest creates an API request. A relative URL can be provided in urlStr,
 // in which case it is resolved relative to the BaseURL of the Client.
 // Relative URLs should always be specified without a preceding slash. If
 // specified, the value pointed to by body is JSON encoded and included as the
 // request body.
 func (c *Client) NewRequest(method, urlStr string, body interface{}) (*http.Request, error) {
-	if !strings.HasSuffix(c.BaseURL.Path, "/") {
-		return nil, fmt.Errorf("BaseURL must have a trailing slash, but %q does not", c.BaseURL)
+	if strings.HasSuffix(c.BaseURL.Path, "/") {
+		return nil, fmt.Errorf("BaseURL must not have a trailing slash, but %q does not", c.BaseURL)
 	}
-	u, err := c.BaseURL.Parse(urlStr)
+
+	signedURLStr, err := signURLStr(c.AuthToken, fmt.Sprintf("/%s/%s", c.Database, urlStr))
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := c.BaseURL.Parse(signedURLStr)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +153,6 @@ func (c *Client) NewRequest(method, urlStr string, body interface{}) (*http.Requ
 	if c.UserAgent != "" {
 		req.Header.Set("User-Agent", c.UserAgent)
 	}
-	if c.AuthToken != "" {
 		req.Header.Set("Authentication", "Basic "+c.AuthToken)
 	}
 	return req, nil

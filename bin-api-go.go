@@ -114,9 +114,7 @@ func signURLStr(token string, urlStr string) (string, error) {
 
 // NewRequest creates an API request. A relative URL can be provided in urlStr,
 // in which case it is resolved relative to the BaseURL of the Client.
-// Relative URLs should always be specified without a preceding slash. If
-// specified, the value pointed to by body is JSON encoded and included as the
-// request body.
+// Relative URLs should always be specified without a preceding slash.
 func (c *Client) NewRequest(method, urlStr string, body interface{}) (*http.Request, error) {
 	if strings.HasSuffix(c.BaseURL.Path, "/") {
 		return nil, fmt.Errorf("BaseURL must not have a trailing slash, but %q does not", c.BaseURL)
@@ -240,85 +238,23 @@ func newResponse(r *http.Response) *Response {
 	return response
 }
 
-/*
-An Error reports more details on an individual error in an ErrorResponse.
-These are the possible validation error codes:
-
-    missing:
-        resource does not exist
-    missing_field:
-        a required field on a resource has not been set
-    invalid:
-        the formatting of a field is invalid
-    already_exists:
-        another resource has the same valid as this field
-    custom:
-        some resources return this (e.g. github.User.CreateKey()), additional
-        information is set in the Message field of the Error
-
-GitHub error responses structure are often undocumented and inconsistent.
-Sometimes error is just a simple string (Issue #540).
-In such cases, Message represents an error message as a workaround.
-
-GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/#client-errors
-*/
-type Error struct {
-	Resource string `json:"resource"` // resource on which the error occurred
-	Field    string `json:"field"`    // field on which the error occurred
-	Code     string `json:"code"`     // validation error code
-	Message  string `json:"message"`  // Message describing the error. Errors with Code == "custom" will always have this set.
-}
-
-func (e *Error) Error() string {
-	return fmt.Sprintf("%v error caused by %v field on %v resource",
-		e.Code, e.Field, e.Resource)
-}
-
-func (e *Error) UnmarshalJSON(data []byte) error {
-	type aliasError Error // avoid infinite recursion by using type alias.
-	if err := json.Unmarshal(data, (*aliasError)(e)); err != nil {
-		return json.Unmarshal(data, &e.Message) // data can be json string.
-	}
-	return nil
-}
-
-/*
-An ErrorResponse reports one or more errors caused by an API request.
-
-GitHub API docs: https://docs.github.com/en/free-pro-team@latest/rest/reference/#client-errors
-*/
+// An ErrorResponse is used when API returns an error
 type ErrorResponse struct {
 	Response *http.Response // HTTP response that caused this error
 	Message  string         `json:"message"` // error message
-	Errors   []Error        `json:"errors"`  // more detail on individual errors
-	// Block is only populated on certain types of errors such as code 451.
-	// See https://developer.github.com/changes/2016-03-17-the-451-status-code-is-now-supported/
-	// for more information.
-	Block *struct {
-		Reason string `json:"reason,omitempty"`
-		// CreatedAt *Timestamp `json:"created_at,omitempty"`
-	} `json:"block,omitempty"`
-	// Most errors will also include a documentation_url field pointing
-	// to some content that might help you resolve the error, see
-	// https://docs.github.com/en/free-pro-team@latest/rest/reference/#client-errors
-	DocumentationURL string `json:"documentation_url,omitempty"`
 }
 
 func (r *ErrorResponse) Error() string {
-	return fmt.Sprintf("%v %v: %d %v %+v",
+	return fmt.Sprintf("%v %v: %d %v",
 		r.Response.Request.Method, sanitizeURL(r.Response.Request.URL),
-		r.Response.StatusCode, r.Message, r.Errors)
+		r.Response.StatusCode, r.Message)
 }
 
 // CheckResponse checks the API response for errors, and returns them if
 // present. A response is considered an error if it has a status code outside
-// the 200 range or equal to 202 Accepted.
+// the 200 range.
 // API error responses are expected to have response
 // body, and a JSON response body that maps to ErrorResponse.
-//
-// The error type will be *RateLimitError for rate limit exceeded errors,
-// *AcceptedError for 202 Accepted status codes,
-// and *TwoFactorAuthError for two-factor authentication errors.
 func CheckResponse(r *http.Response) error {
 	if c := r.StatusCode; 200 <= c && c <= 299 {
 		return nil
@@ -328,22 +264,7 @@ func CheckResponse(r *http.Response) error {
 	if err == nil && data != nil {
 		json.Unmarshal(data, errorResponse)
 	}
-	// Re-populate error response body because GitHub error responses are often
-	// undocumented and inconsistent.
-	// Issue #1136, #540.
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(data))
-	switch {
-	//case r.StatusCode == http.StatusUnauthorized && strings.HasPrefix(r.Header.Get(headerOTP), "required"):
-	//	return (*TwoFactorAuthError)(errorResponse)
-	//case r.StatusCode == http.StatusForbidden && r.Header.Get(headerRateRemaining) == "0":
-	//	return &RateLimitError{
-	//		Rate:     parseRate(r),
-	//		Response: errorResponse.Response,
-	//		Message:  errorResponse.Message,
-	//	}
-	default:
-		return errorResponse
-	}
+	return errorResponse
 }
 
 // sanitizeURL redacts the client_secret parameter from the URL which may be

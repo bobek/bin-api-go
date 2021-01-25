@@ -12,7 +12,7 @@ import (
 func main() {
 	println("Testing...")
 
-	client := binapi.NewClient(nil)
+	client := binapi.NewClient(nil, "secret_auth_token")
 	fmt.Println(client)
 
 	user, resp, _ := client.Users.Get(context.Background(), "bobek")

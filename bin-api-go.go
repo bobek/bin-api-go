@@ -32,8 +32,8 @@ type Client struct {
 	// always be specified with a trailing slash.
 	BaseURL *url.URL
 
-	// User agent used when communicating with the GitHub API.
 	UserAgent string
+	AuthToken string
 
 	common service // Reuse a single struct instead of allocating one for each service on the heap.
 
@@ -66,13 +66,13 @@ func addOptions(s string, opts interface{}) (string, error) {
 	return u.String(), nil
 }
 
-func NewClient(httpClient *http.Client) *Client {
+func NewClient(httpClient *http.Client, authToken string) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{}
 	}
 	baseURL, _ := url.Parse(defaultBaseURL)
 
-	c := &Client{client: httpClient, BaseURL: baseURL, UserAgent: userAgent}
+	c := &Client{client: httpClient, BaseURL: baseURL, UserAgent: userAgent, AuthToken: authToken}
 	c.common.client = c
 	c.Users = (*UsersService)(&c.common)
 	return c
@@ -119,6 +119,9 @@ func (c *Client) NewRequest(method, urlStr string, body interface{}) (*http.Requ
 	req.Header.Set("Accept", mediaType)
 	if c.UserAgent != "" {
 		req.Header.Set("User-Agent", c.UserAgent)
+	}
+	if c.AuthToken != "" {
+		req.Header.Set("Authentication", "Basic "+c.AuthToken)
 	}
 	return req, nil
 }
@@ -169,8 +172,6 @@ func (c *Client) BareDo(ctx context.Context, req *http.Request) (*Response, erro
 // error if an API error has occurred. If v implements the io.Writer interface,
 // the raw response body will be written to v, without attempting to first
 // decode it. If v is nil, and no error hapens, the response is returned as is.
-// If rate limit is exceeded and reset time is in the future, Do returns
-// *RateLimitError immediately without making a network API call.
 //
 // The provided ctx must be non-nil, if it is nil an error is returned. If it
 // is canceled or times out, ctx.Err() will be returned.

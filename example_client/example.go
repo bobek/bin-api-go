@@ -61,4 +61,23 @@ func main() {
 	fmt.Println("type: ", reflect.TypeOf(listPrep.Target))
 	fmt.Printf("%+v\n", listPrep.Target)
 
+	fmt.Println("POST DV:")
+	dv := &binapi.DetailView{
+		Timestamp:     "Fri 05 Feb 2021 02:42:24 PM CET",
+		Duration:      120,
+		CascadeCreate: true,
+		UserId:        "bobek",
+		ItemId:        "item001",
+	}
+	// resp, err = client.DetailViews.Post(context.Background(), dv)
+	// fmt.Printf("%+v\n", resp)
+	// fmt.Printf("%+v\n", err)
+
+	dvPrep, err := client.DetailViews.PreparePost(dv)
+	fmt.Printf("%+v\n", err)
+	dvResp, err := client.Send(context.Background(), dvPrep)
+	fmt.Println("type: ", reflect.TypeOf(dvResp))
+	fmt.Printf("%+v\n", dvResp)
+	fmt.Printf("%+v\n", err)
+
 }

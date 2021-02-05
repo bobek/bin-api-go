@@ -45,6 +45,7 @@ type Client struct {
 
 	Users          *UsersService
 	UserProperties *UserPropertiesService
+	DetailViews    *DetailViewsService
 }
 
 type service struct {
@@ -83,6 +84,7 @@ func NewClient(httpClient *http.Client, database string, authToken string) *Clie
 	c.common.client = c
 	c.Users = (*UsersService)(&c.common)
 	c.UserProperties = (*UserPropertiesService)(&c.common)
+	c.DetailViews = (*DetailViewsService)(&c.common)
 	return c
 }
 

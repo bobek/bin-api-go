@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 
 	"github.com/bobek/bin-api-go/v1/binapi"
 )
@@ -33,4 +34,31 @@ func main() {
 	fmt.Println(upn)
 	fmt.Printf("%+v\n", resp)
 	fmt.Printf("%+v\n", err)
+
+	getPrep, err := client.UserProperties.PrepareGet("str_property")
+	fmt.Printf("%+v\n", getPrep)
+	fmt.Printf("%+v\n", err)
+
+	getResp, err := client.Send(context.Background(), getPrep)
+	fmt.Println("type: ", reflect.TypeOf(getResp))
+	fmt.Printf("%+v\n", getResp)
+	fmt.Printf("%+v\n", err)
+	fmt.Println("type: ", reflect.TypeOf(getPrep.Target))
+	fmt.Printf("%+v\n", getPrep.Target)
+
+	fmt.Println("listPrep:")
+	listPrep, err := client.UserProperties.PrepareList()
+	fmt.Printf("%+v\n", listPrep)
+	fmt.Printf("%+v\n", err)
+	fmt.Println("type: ", reflect.TypeOf(listPrep.Target))
+	fmt.Printf("%+v\n", listPrep.Target)
+
+	fmt.Println("listResp:")
+	listResp, err := client.Send(context.Background(), listPrep)
+	fmt.Println("type: ", reflect.TypeOf(listResp))
+	fmt.Printf("%+v\n", listResp)
+	fmt.Printf("%+v\n", err)
+	fmt.Println("type: ", reflect.TypeOf(listPrep.Target))
+	fmt.Printf("%+v\n", listPrep.Target)
+
 }

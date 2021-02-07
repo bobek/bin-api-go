@@ -36,6 +36,21 @@ func (s *UserPropertiesService) Get(ctx context.Context, propertyName string) (*
 	return up, resp, nil
 }
 
+// Get returns information about selected user property
+func (s *UserPropertiesService) PrepareGet(propertyName string) (*Request, error) {
+	u := fmt.Sprintf("users/properties/%v", propertyName)
+
+	req, err := s.client.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Request{
+		HttpRequest: req,
+		Target:      new(UserProperty),
+	}, nil
+}
+
 // List returns all defined user properties
 func (s *UserPropertiesService) List(ctx context.Context) ([]*UserProperty, *Response, error) {
 	u := "users/properties/list/"
@@ -52,4 +67,19 @@ func (s *UserPropertiesService) List(ctx context.Context) ([]*UserProperty, *Res
 	}
 
 	return properties, resp, nil
+}
+
+func (s *UserPropertiesService) PrepareList() (*Request, error) {
+	u := "users/properties/list/"
+
+	req, err := s.client.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var properties []*UserProperty
+	return &Request{
+		HttpRequest: req,
+		Target:      &properties,
+	}, nil
 }

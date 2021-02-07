@@ -45,6 +45,7 @@ type Client struct {
 
 	Users          *UsersService
 	UserProperties *UserPropertiesService
+	DetailViews    *DetailViewsService
 }
 
 type service struct {
@@ -83,12 +84,19 @@ func NewClient(httpClient *http.Client, database string, authToken string) *Clie
 	c.common.client = c
 	c.Users = (*UsersService)(&c.common)
 	c.UserProperties = (*UserPropertiesService)(&c.common)
+	c.DetailViews = (*DetailViewsService)(&c.common)
 	return c
+}
+
+type Request struct {
+	HttpRequest *http.Request
+	Target      interface{}
 }
 
 // Response represents an API response
 type Response struct {
 	*http.Response
+	Value interface{}
 }
 
 func signURLStr(token string, urlStr string) (string, error) {
@@ -204,7 +212,7 @@ func (c *Client) BareDo(ctx context.Context, req *http.Request) (*Response, erro
 // JSON decoded and stored in the value pointed to by v, or returned as an
 // error if an API error has occurred. If v implements the io.Writer interface,
 // the raw response body will be written to v, without attempting to first
-// decode it. If v is nil, and no error hapens, the response is returned as is.
+// decode it. If v is nil, and no error happens, the response is returned as is.
 //
 // The provided ctx must be non-nil, if it is nil an error is returned. If it
 // is canceled or times out, ctx.Err() will be returned.
@@ -231,10 +239,20 @@ func (c *Client) Do(ctx context.Context, req *http.Request, v interface{}) (*Res
 	return resp, err
 }
 
+func (c *Client) Send(ctx context.Context, req *Request) (*Response, error) {
+	resp, err := c.Do(ctx, req.HttpRequest, req.Target)
+	if err != nil {
+		return resp, err
+	}
+
+	resp.Value = req.Target
+	return resp, nil
+}
+
 // newResponse creates a new Response for the provided http.Response.
 // r must not be nil.
 func newResponse(r *http.Response) *Response {
-	response := &Response{Response: r}
+	response := &Response{Response: r, Value: nil}
 	return response
 }
 
